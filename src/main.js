@@ -1,33 +1,42 @@
 import redis from 'redis';
 const client = redis.createClient();
 
-function saveLink(client, id, author, title, link) {
-  client.hmset(`link:${id}`, 'author', author, 'title', title, 'link', link, 'score', 0);
+function markDealAsSent(client, dealId, userId) {
+  client.sadd(dealId, userId);
 }
 
-function upVote(client, id) {
-  client.hincrby(`link:${id}`, 'score', 1);
-}
-
-function downVote(client, id) {
-  client.hincrby(`link:${id}`, 'score', -1);
-}
-
-function showDetails(client, id) {
-  client.hgetall(`link:${id}`, (err, result) => {
-    console.log(result);
+function sendDealIfNotSent(client, dealId, userId) {
+  client.sismember(dealId, userId, function(err, reply) {
+    if (reply) {
+      console.log(dealId, userId, 'already sent');
+    } else {
+      console.log(dealId, userId, 'sending');
+      markDealAsSent(client, dealId, userId);
+    }
   });
 }
 
-saveLink(client, 123, "dayvson", "Maxwell Dayvson's Github page", "https://github.com/dayvson");
-upVote(client, 123);
-upVote(client, 123);
-saveLink(client, 456, "hltbra", "Hugo Tavares's Github page", "https://github.com/hltbra");
-upVote(client, 456);
-upVote(client, 456);
-downVote(client, 456);
+function showUsersThatReceivedAllDeals(client, dealIds) {
+  client.sinter(dealIds, function(err, reply) {
+    console.log(reply);
+  });
+}
 
-showDetails(client, 123);
-showDetails(client, 456);
+function showUsersThatReceivedAtLeastOneOfTheDeals(client, dealIds) {
+  client.sunion(dealIds, function(err, reply) {
+    console.log(reply);
+  });
+}
+
+markDealAsSent(client, 'deal:1', 'user:1');
+markDealAsSent(client, 'deal:1', 'user:2');
+markDealAsSent(client, 'deal:2', 'user:1');
+markDealAsSent(client, 'deal:2', 'user:3');
+sendDealIfNotSent(client, 'deal:1', 'user:1');
+sendDealIfNotSent(client, 'deal:1', 'user:2');
+sendDealIfNotSent(client, 'deal:1', 'user:3');
+showUsersThatReceivedAllDeals(client, ["deal:1", "deal:2"]);
+showUsersThatReceivedAtLeastOneOfTheDeals(client, ["deal:1", "deal:2"]);
+
 
 client.quit();
