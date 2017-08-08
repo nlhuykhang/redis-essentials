@@ -1,15 +1,10 @@
-const a = { b:1, c:2 };
+import redis from 'redis';
 
-const {
-  b,
-  c,
-} = a;
+const client = redis.createClient();
 
-const d = {
-  a: 3,
-  ...a,
-};
+client.set('test', 'test key value');
 
-console.log(b, c);
+client.get('test', redis.print);
 
-console.log(d);
+
+client.quit();
