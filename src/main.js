@@ -1,42 +1,53 @@
 import redis from 'redis';
 const client = redis.createClient();
 
-function markDealAsSent(client, dealId, userId) {
-  client.sadd(dealId, userId);
+function LeaderBoard(client, key) {
+  this.key = key;
+  this.client = client;
 }
 
-function sendDealIfNotSent(client, dealId, userId) {
-  client.sismember(dealId, userId, function(err, reply) {
-    if (reply) {
-      console.log(dealId, userId, 'already sent');
-    } else {
-      console.log(dealId, userId, 'sending');
-      markDealAsSent(client, dealId, userId);
-    }
+LeaderBoard.prototype.addUser = function(username, score) {
+  this.client.zadd([this.key, score, username], function(err) {
+    console.log(username, 'add');
   });
 }
 
-function showUsersThatReceivedAllDeals(client, dealIds) {
-  client.sinter(dealIds, function(err, reply) {
-    console.log(reply);
+LeaderBoard.prototype.removeUser = function(username) {
+  this.client.zrem(this.key, username, function() {
+    console.log(username, 'remove');
   });
 }
 
-function showUsersThatReceivedAtLeastOneOfTheDeals(client, dealIds) {
-  client.sunion(dealIds, function(err, reply) {
-    console.log(reply);
+LeaderBoard.prototype.getUserScoreAndRank = function(username) {
+  const key = this.key;
+  const client = this.client;
+
+  client.zscore(key, username, function(err, score) {
+    client.zrevrange(key, username, function(err, rank) {
+      console.log(username, score, rank);
+    });
   });
-}
+};
 
-markDealAsSent(client, 'deal:1', 'user:1');
-markDealAsSent(client, 'deal:1', 'user:2');
-markDealAsSent(client, 'deal:2', 'user:1');
-markDealAsSent(client, 'deal:2', 'user:3');
-sendDealIfNotSent(client, 'deal:1', 'user:1');
-sendDealIfNotSent(client, 'deal:1', 'user:2');
-sendDealIfNotSent(client, 'deal:1', 'user:3');
-showUsersThatReceivedAllDeals(client, ["deal:1", "deal:2"]);
-showUsersThatReceivedAtLeastOneOfTheDeals(client, ["deal:1", "deal:2"]);
+LeaderBoard.prototype.showTopUsers = function(quantity) {
+  this.client.zrevrange([this.key, 0, quantity - 1, 'withscores'], function(err, replies) {
+    console.log('top users: ', replies);
+  });
+};
 
+const leaderBoard = new LeaderBoard(client, 'game-score');
+
+leaderBoard.addUser("Arthur", 70.);
+leaderBoard.addUser("KC", 20.);
+leaderBoard.addUser("Maxwell", 10.);
+leaderBoard.addUser("Patrik", 30.);
+leaderBoard.addUser("Ana", 60.);
+leaderBoard.addUser("Felipe", 40.);
+leaderBoard.addUser("Renata", 50.);
+leaderBoard.addUser("Hugo", 80.);
+leaderBoard.removeUser("Arthur");
+
+leaderBoard.getUserScoreAndRank("Maxwell");
+leaderBoard.showTopUsers(3);
 
 client.quit();
